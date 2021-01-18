@@ -1,3 +1,21 @@
+## **Release v1.13.21 - 2021-01-08**
+**Updated for Hearthstone 19.2.1.70828**
+**Fixes**
+- Fixed an issue where player's could see cards created by C'thun The Shattered in their opponents' hands.
+
+## **Release v1.13.20 - 2020-12-18**
+**New**:
+- Added experience bar. 
+**Fixes**:
+- Improved Bob's Buddy for most recent patch.
+
+## **Release v1.13.19 - 2020-12-15**
+**Fixes**:
+- Fixed an issue where playing against or with Fish of N'Zoth could cause Bob's Buddy to not run that turn.
+
+## **Release v1.13.18 - 2020-12-15**
+**Updated for Hearthstone 19.2.0.68600**
+
 ## **Release v1.13.17 - 2020-12-04**
 **Fixes**:
 - Restore option to not show flavor text on card hover.

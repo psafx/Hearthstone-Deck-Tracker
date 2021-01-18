@@ -15,8 +15,10 @@ using Hearthstone_Deck_Tracker.Hearthstone;
 using Hearthstone_Deck_Tracker.Utility.Logging;
 using static System.Windows.Visibility;
 using Card = Hearthstone_Deck_Tracker.Hearthstone.Card;
-using HearthDb.Enums;
 using Hearthstone_Deck_Tracker.Utility;
+using System.Threading.Tasks;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 #endregion
 
@@ -44,6 +46,8 @@ namespace Hearthstone_Deck_Tracker.Windows
 		private readonly List<Ellipse> _playerBoard = new List<Ellipse>();
 		private readonly List<Rectangle> _playerHand = new List<Rectangle>();
 		private readonly List<Rectangle> _leaderboardIcons = new List<Rectangle>();
+		private readonly List<HearthstoneTextBlock> _leaderboardDeadForText = new List<HearthstoneTextBlock>();
+		private readonly List<HearthstoneTextBlock> _leaderboardDeadForTurnText = new List<HearthstoneTextBlock>();
 		private bool? _isFriendsListOpen;
 		private string _lastToolTipCardId;
 		private bool _lmbDown;
@@ -60,6 +64,12 @@ namespace Hearthstone_Deck_Tracker.Windows
 		private OverlayElementBehavior _bgsTopBarBehavior;
 		private OverlayElementBehavior _bgsBobsBuddyBehavior;
 		private OverlayElementBehavior _bgsPastOpponentBoardBehavior;
+		private OverlayElementBehavior _experienceCounterBehavior;
+
+		private const int LevelResetDelay = 500;
+		private const int ExperienceFadeDelay = 6000;
+
+		Regex BattlegroundsHeroRegex = new Regex(@"TB_BaconShop_HERO_\d\d");
 
 		public OverlayWindow(GameV2 game)
 		{
@@ -107,6 +117,14 @@ namespace Hearthstone_Deck_Tracker.Windows
 				AnchorSide = Side.Top,
 				EntranceAnimation = AnimationType.Instant,
 				ExitAnimation = AnimationType.Instant,
+			};
+
+			_experienceCounterBehavior = new OverlayElementBehavior(ExperienceCounter)
+			{
+				GetRight = () => Height * .35,
+				GetTop = () => Height * .9652,
+				AnchorSide = Side.Bottom,
+				GetScaling = () => AutoScaling,
 			};
 
 			if(Config.Instance.ExtraFeatures && Config.Instance.ForceMouseHook)
@@ -311,6 +329,70 @@ namespace Hearthstone_Deck_Tracker.Windows
 		{
 			_bgsBobsBuddyBehavior.Hide();
 			BobsBuddyDisplay.ResetDisplays();
+		}
+
+		internal void ShowExperienceCounter()
+		{
+			//_experienceCounterBehavior.Show();
+			if(Config.Instance.ShowExperienceCounter)
+				ExperienceCounter.Visibility = Visible;
+		}
+
+		internal void HideExperienceCounter()
+		{
+			if(!AnimatingXPBar)
+				ExperienceCounter.Visibility = Collapsed;
+		}
+
+		public static bool AnimatingXPBar = false;
+
+		internal async Task ExperienceChangedAsync(int experience, int experienceNeeded, int level, int levelChange, bool animate)
+		{
+			while(_game.CurrentMode == Enums.Hearthstone.Mode.GAMEPLAY && _game.PreviousMode == Enums.Hearthstone.Mode.BACON)
+			{
+				await Task.Delay(500);
+			}
+			ExperienceCounter.XPDisplay = string.Format($"{experience}/{experienceNeeded}");
+			ExperienceCounter.LevelDisplay = (level + 1).ToString();
+			if(animate)
+			{
+				AnimatingXPBar = true;
+				ShowExperienceCounter();
+				for(int i = 0; i < levelChange; i++)
+				{
+					ExperienceCounter.ChangeRectangleFill(1, false);
+					await Task.Delay(ExperienceFadeDelay);
+					ExperienceCounter.ResetRectangleFill();
+					await Task.Delay(LevelResetDelay);
+				}
+				ExperienceCounter.ChangeRectangleFill((double)experience / (double)experienceNeeded, false);
+				await Task.Delay(ExperienceFadeDelay);
+				AnimatingXPBar = false;
+			}
+			else
+			{
+				ExperienceCounter.ChangeRectangleFill((double)experience / (double)experienceNeeded, true);
+			}
+			if(_game.CurrentMode != Enums.Hearthstone.Mode.HUB)
+				HideExperienceCounter();
+		}
+
+		internal void UpdateOpponentDeadForTurns(List<int> turns)
+		{
+			var index = _game.Entities.Values.Where(x => x.IsHero && x.Info.Turn == 0 && BattlegroundsHeroRegex.IsMatch(x.CardId) && !x.Info.Discarded).Count() - 1;
+			foreach(var text in _leaderboardDeadForText)
+				text.Text = "";
+			foreach(var text in _leaderboardDeadForTurnText)
+				text.Text = "";
+			foreach(var turn in turns)
+			{
+				if(index < _leaderboardDeadForText.Count && index < _leaderboardDeadForTurnText.Count && index >= 0)
+				{
+					_leaderboardDeadForText[index].Text = $"{turn}";
+					_leaderboardDeadForTurnText[index].Text = turn == 1 ? LocUtil.Get("Overlay_Battlegrounds_Dead_For_Turn") : LocUtil.Get("Overlay_Battlegrounds_Dead_For_Turns");
+				}
+				index--;
+			}
 		}
 	}
 }
